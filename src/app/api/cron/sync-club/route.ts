@@ -12,6 +12,7 @@ import { getServerSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * Vérifie l'autorisation d'accès via CRON_SECRET ou rôle RBAC (directeur / superadmin).
