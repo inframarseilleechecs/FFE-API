@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { searchFfePlayers } from "../service";
 
-describe("Scraper - Live FFE Server Integration (Online)", () => {
+// Dans GitHub Actions CI, les serveurs FFE bloquent ou limitent souvent les adresses IP des runners cloud
+const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+
+describe.skipIf(isCI)("Scraper - Live FFE Server Integration (Online)", () => {
   it("queries the live FFE website for CHUKHNO and extracts real data from Marseille-Echecs", async () => {
     const result = await searchFfePlayers({
       nom: "CHUKHNO",
