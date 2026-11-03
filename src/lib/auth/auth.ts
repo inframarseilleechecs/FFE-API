@@ -11,7 +11,16 @@ const pool = getDbPool();
 
 export const auth = betterAuth({
   database: pool || (process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : undefined),
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  baseURL:
+    process.env.BETTER_AUTH_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
+  trustedOrigins: [
+    "https://ffe-api.vercel.app",
+    "https://*.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3002",
+    ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
+  ],
   secret: process.env.BETTER_AUTH_SECRET || "recupffe_fallback_secret_key_at_least_32_chars_2026",
   emailAndPassword: {
     enabled: true,
