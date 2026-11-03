@@ -352,6 +352,64 @@ export async function getSyncLogs(limit = 50): Promise<SyncLogRecord[]> {
 }
 
 /**
+ * Retourne le décompte détaillé des joueurs (actifs Licence A/B vs anciens adhérents non renouvelés).
+ */
+export interface PlayersCountBreakdown {
+  total: number;
+  active: number;
+  licenseA: number;
+  licenseB: number;
+  inactive: number;
+}
+
+export async function getPlayersCountBreakdown(): Promise<PlayersCountBreakdown> {
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      const res = await pool.query(`
+        SELECT 
+          COUNT(*)::int as total,
+          COUNT(*) FILTER (WHERE af IN ('A', 'B'))::int as active,
+          COUNT(*) FILTER (WHERE af = 'A')::int as "licenseA",
+          COUNT(*) FILTER (WHERE af = 'B')::int as "licenseB",
+          COUNT(*) FILTER (WHERE af = 'N' OR af IS NULL)::int as inactive
+        FROM players;
+      `);
+      if (res.rows[0]) {
+        return res.rows[0];
+      }
+    } catch (err) {
+      console.warn("Échec count breakdown Postgres, bascule sur mémoire:", err);
+    }
+  }
+
+  let active = 0;
+  let licenseA = 0;
+  let licenseB = 0;
+  let inactive = 0;
+
+  for (const p of memoryPlayers.values()) {
+    if (p.af === "A") {
+      active++;
+      licenseA++;
+    } else if (p.af === "B") {
+      active++;
+      licenseB++;
+    } else {
+      inactive++;
+    }
+  }
+
+  return {
+    total: memoryPlayers.size,
+    active,
+    licenseA,
+    licenseB,
+    inactive,
+  };
+}
+
+/**
  * Retourne le nombre total de joueurs licenciés enregistrés en base.
  */
 export async function getPlayersCount(): Promise<number> {
@@ -373,6 +431,8 @@ export async function getPlayersCount(): Promise<number> {
  */
 export interface ClubDemographicStats {
   total: number;
+  active: number;
+  inactive: number;
   licenceA: number;
   licenceB: number;
   hommes: number;
@@ -389,6 +449,8 @@ export async function getClubDemographicStats(): Promise<ClubDemographicStats> {
       const res = await pool.query(`
         SELECT 
           COUNT(*)::int as total,
+          COUNT(*) FILTER (WHERE af IN ('A', 'B'))::int as active,
+          COUNT(*) FILTER (WHERE af = 'N' OR af IS NULL)::int as inactive,
           COUNT(*) FILTER (WHERE af = 'A')::int as "licenceA",
           COUNT(*) FILTER (WHERE af = 'B')::int as "licenceB",
           COUNT(*) FILTER (WHERE cat LIKE '%F')::int as femmes,
@@ -407,6 +469,8 @@ export async function getClubDemographicStats(): Promise<ClubDemographicStats> {
   }
 
   // Calcul sur repli mémoire
+  let active = 0;
+  let inactive = 0;
   let licenceA = 0;
   let licenceB = 0;
   let femmes = 0;
@@ -416,8 +480,15 @@ export async function getClubDemographicStats(): Promise<ClubDemographicStats> {
   let veterans = 0;
 
   for (const p of memoryPlayers.values()) {
-    if (p.af === "A") licenceA++;
-    if (p.af === "B") licenceB++;
+    if (p.af === "A") {
+      active++;
+      licenceA++;
+    } else if (p.af === "B") {
+      active++;
+      licenceB++;
+    } else {
+      inactive++;
+    }
     if (p.cat.endsWith("F")) femmes++;
     if (p.cat.endsWith("M")) hommes++;
     const prefix = p.cat.slice(0, 3);
@@ -432,6 +503,8 @@ export async function getClubDemographicStats(): Promise<ClubDemographicStats> {
 
   return {
     total: memoryPlayers.size,
+    active,
+    inactive,
     licenceA,
     licenceB,
     hommes,

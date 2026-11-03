@@ -15,6 +15,8 @@ import {
 
 interface DemographicStats {
   total: number;
+  active?: number;
+  inactive?: number;
   licenceA: number;
   licenceB: number;
   hommes: number;
@@ -103,19 +105,19 @@ export function ClubAnalyticsSection() {
 
       {/* 4 KPIs Majeurs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1 : Effectif Total */}
+        {/* KPI 1 : Effectif Actif Licenciés */}
         <div className="glass-card rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800">
           <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
-            <span>Total Licenciés FFE</span>
+            <span>Licenciés Actifs (2026-2027)</span>
             <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div className="text-3xl font-black text-slate-900 dark:text-white">
-            {total.toLocaleString("fr-FR")}
+            {(stats?.active ?? (licenceA + licenceB)).toLocaleString("fr-FR")}
           </div>
           <p className="text-[11px] text-sky-600 dark:text-sky-400 mt-1 font-medium">
-            1er club d&apos;échecs de la région PACA
+            {stats?.inactive ? `+ ${stats.inactive} anciens adhérents en base` : "Saison en cours"}
           </p>
         </div>
 

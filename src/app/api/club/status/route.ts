@@ -5,13 +5,13 @@
  */
 
 import { NextResponse } from "next/server";
-import { getPlayersCount, getLatestSyncLog } from "@/lib/db/repository";
+import { getPlayersCount, getPlayersCountBreakdown, getLatestSyncLog } from "@/lib/db/repository";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const totalPlayers = await getPlayersCount();
+    const breakdown = await getPlayersCountBreakdown();
     const lastSync = await getLatestSyncLog();
 
     const clubCode = process.env.DEFAULT_CLUB_CODE || "N06013";
@@ -21,8 +21,13 @@ export async function GET() {
       success: true,
       clubCode,
       clubName,
-      totalPlayers,
-      totalMembers: totalPlayers,
+      totalPlayers: breakdown.total,
+      totalMembers: breakdown.active,
+      activeMembers: breakdown.active,
+      licenseA: breakdown.licenseA,
+      licenseB: breakdown.licenseB,
+      inactiveMembers: breakdown.inactive,
+      breakdown,
       lastSync: lastSync
         ? {
             id: lastSync.id,

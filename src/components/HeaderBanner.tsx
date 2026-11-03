@@ -26,6 +26,11 @@ interface ClubStatusData {
   clubCode: string;
   clubName: string;
   totalMembers: number;
+  totalPlayers?: number;
+  activeMembers?: number;
+  licenseA?: number;
+  licenseB?: number;
+  inactiveMembers?: number;
   lastSync: {
     status: string;
     playersSynced: number;
@@ -190,9 +195,27 @@ export function HeaderBanner() {
               <div className="flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-marseille-500 dark:text-sky-400" />
                 <span className="font-semibold text-slate-900 dark:text-white">
-                  {status ? `${status.totalMembers ?? (status as any).totalPlayers ?? 0} licenciés` : (loading ? "..." : "0 licencié")}
+                  {status ? (
+                    <>
+                      <span>{status.activeMembers ?? status.totalMembers ?? 0} licenciés</span>
+                      {status.licenseA !== undefined && status.licenseB !== undefined && (
+                        <span className="font-normal text-slate-500 dark:text-slate-400 ml-1 text-[11px]">
+                          ({status.licenseA} A • {status.licenseB} B)
+                        </span>
+                      )}
+                    </>
+                  ) : (loading ? "..." : "0 licencié")}
                 </span>
               </div>
+
+              {status?.inactiveMembers ? (
+                <span
+                  className="hidden md:inline-flex items-center text-[10px] px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 font-medium cursor-help"
+                  title="Anciens adhérents enregistrés dans la base locale, non encore renouvelés pour la saison en cours 2026-2027"
+                >
+                  + {status.inactiveMembers} non renouvelés
+                </span>
+              ) : null}
 
               <span className="w-px h-3.5 bg-slate-300 dark:bg-slate-700"></span>
 
