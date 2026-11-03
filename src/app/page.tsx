@@ -41,7 +41,7 @@ export default function Home() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
         
         {/* Navigation Tabs Dynamique selon le Rôle RBAC */}
-        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} userRole={session?.user?.role} />
 
         {/* Section Active Sécurisée */}
         <div className="transition-all duration-300">
