@@ -50,6 +50,15 @@ export function SystemLogsSection() {
 
   useEffect(() => {
     fetchLogs();
+
+    const handleSyncComplete = () => {
+      fetchLogs();
+    };
+
+    window.addEventListener("recupffe:sync-completed", handleSyncComplete);
+    return () => {
+      window.removeEventListener("recupffe:sync-completed", handleSyncComplete);
+    };
   }, []);
 
   const totalLogs = logs.length;

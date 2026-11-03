@@ -128,6 +128,9 @@ export function HeaderBanner() {
       });
     } finally {
       setSyncing(false);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("recupffe:sync-completed"));
+      }
       setTimeout(() => setFeedback(null), 8000);
     }
   };
