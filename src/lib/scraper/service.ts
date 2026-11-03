@@ -134,6 +134,8 @@ export async function resolveClub(clubInput: string): Promise<Club[]> {
 
 export interface FetchClubMembersOptions {
   concurrency?: number;
+  maxTimeMs?: number;
+  pageTimeoutMs?: number;
   onProgress?: (current: number, total: number) => void;
 }
 
@@ -148,7 +150,7 @@ export interface FetchClubMembersResult {
 /**
  * Télécharge la totalité des licenciés d'un club (ex: Marseille-Échecs)
  * en mode parallèle par lots concurrents de 4 pages (Promise.allSettled)
- * avec tolérance aux pannes (Graceful Partial Fallback).
+ * avec tolérance aux pannes (Graceful Partial Fallback) et budget temps strict.
  */
 export async function fetchAllClubMembers(
   clubCode: string,
@@ -164,15 +166,18 @@ export async function fetchAllClubMembers(
     };
   }
 
+  const startTime = Date.now();
   const onProgress = typeof options === "function" ? options : options?.onProgress;
   const concurrency = (typeof options === "object" && options?.concurrency) || 4;
+  const maxTimeMs = (typeof options === "object" && options?.maxTimeMs) || 45000;
+  const pageTimeoutMs = (typeof options === "object" && options?.pageTimeoutMs) || 8000;
 
   const listUrl = `${FFE_BASE_URL}/ListeJoueurs.aspx?Action=CLUBCODE&ClubCode=${encodeURIComponent(
     clubCode
   )}`;
 
-  // 1. Page 1 (GET)
-  const firstHtml = await fetchFfePage(listUrl);
+  // 1. Page 1 (GET) avec timeout maîtrisé de 12s
+  const firstHtml = await fetchFfePage(listUrl, { timeoutMs: 12000, retries: 1 });
   const totalPages = extractTotalPages(firstHtml);
   const { viewState, viewStateGenerator } = extractViewState(firstHtml);
 
@@ -207,6 +212,15 @@ export async function fetchAllClubMembers(
   }
 
   for (let i = 0; i < remainingPages.length; i += concurrency) {
+    // Garde-fou Vercel : Si le budget temps approche des 45s, on stoppe pour garantir la sauvegarde
+    if (Date.now() - startTime > maxTimeMs) {
+      console.warn(`Budget temps de ${maxTimeMs}ms atteint. Arrêt du scraping des pages restantes pour persistance.`);
+      for (const p of remainingPages.slice(i)) {
+        missingPages.push(p);
+      }
+      break;
+    }
+
     const chunk = remainingPages.slice(i, i + concurrency);
 
     const chunkPromises = chunk.map(async (page) => {
@@ -221,6 +235,8 @@ export async function fetchAllClubMembers(
         const pageHtml = await fetchFfePage(listUrl, {
           method: "POST",
           body: postBody.toString(),
+          timeoutMs: pageTimeoutMs,
+          retries: 0, // Pas de retry individuel pour ne pas bloquer le lot entier
           customHeaders: {
             Referer: listUrl,
           },

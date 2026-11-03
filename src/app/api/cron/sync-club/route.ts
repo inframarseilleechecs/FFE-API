@@ -111,8 +111,12 @@ async function executeSync(request: NextRequest) {
   }
 
   try {
-    // 1. Scraping complet des pages de l'effectif FFE (parallélisé par lots de 4)
-    const syncResult = await fetchAllClubMembers(clubCode);
+    // 1. Scraping complet des pages de l'effectif FFE (parallélisé par lots de 4 avec budget temps strict de 45s)
+    const syncResult = await fetchAllClubMembers(clubCode, {
+      concurrency: 4,
+      maxTimeMs: 45000,
+      pageTimeoutMs: 8000,
+    });
     const players = Array.isArray(syncResult) ? syncResult : syncResult.players;
     const isPartial = Array.isArray(syncResult) ? false : syncResult.isPartial;
     const missingPages = Array.isArray(syncResult) ? [] : syncResult.missingPages;
