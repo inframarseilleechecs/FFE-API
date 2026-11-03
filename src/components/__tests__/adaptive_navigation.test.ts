@@ -19,7 +19,8 @@ describe("Adaptive UI & RBAC Navigation - Automated Tests (Étape 10A)", () => {
     expect(directorTabs).toHaveLength(6);
 
     const superadminTabs = getAllowedTabsForRole("superadmin").map((t) => t.key);
-    expect(superadminTabs).toHaveLength(6);
+    expect(superadminTabs).toContain("logs");
+    expect(superadminTabs).toHaveLength(7);
 
     // Droit de synchronisation FFE dans l'en-tête
     expect(hasPermission("director", "sync:execute")).toBe(true);

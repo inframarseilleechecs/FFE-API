@@ -65,7 +65,13 @@ describe("Cron 24h & Sync Club API Route (/api/cron/sync-club)", () => {
   });
 
   it("successfully synchronizes club members and records SUCCESS log with Bearer token", async () => {
-    vi.spyOn(scraperService, "fetchAllClubMembers").mockResolvedValue(mockPlayers);
+    vi.spyOn(scraperService, "fetchAllClubMembers").mockResolvedValue({
+      players: mockPlayers,
+      totalPages: 1,
+      pagesFetched: [1],
+      missingPages: [],
+      isPartial: false,
+    });
 
     const req = new NextRequest("http://localhost:3000/api/cron/sync-club?club=N06013", {
       headers: { authorization: `Bearer ${SECRET}` },
@@ -93,7 +99,13 @@ describe("Cron 24h & Sync Club API Route (/api/cron/sync-club)", () => {
   });
 
   it("supports manual trigger via POST with ?secret= parameter", async () => {
-    vi.spyOn(scraperService, "fetchAllClubMembers").mockResolvedValue(mockPlayers);
+    vi.spyOn(scraperService, "fetchAllClubMembers").mockResolvedValue({
+      players: mockPlayers,
+      totalPages: 1,
+      pagesFetched: [1],
+      missingPages: [],
+      isPartial: false,
+    });
 
     const req = new NextRequest(`http://localhost:3000/api/cron/sync-club?secret=${SECRET}`, {
       method: "POST",

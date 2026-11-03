@@ -111,8 +111,12 @@ async function executeSync(request: NextRequest) {
   }
 
   try {
-    // 1. Scraping complet des pages de l'effectif FFE
-    const players = await fetchAllClubMembers(clubCode);
+    // 1. Scraping complet des pages de l'effectif FFE (parallélisé par lots de 4)
+    const syncResult = await fetchAllClubMembers(clubCode);
+    const players = Array.isArray(syncResult) ? syncResult : syncResult.players;
+    const isPartial = Array.isArray(syncResult) ? false : syncResult.isPartial;
+    const missingPages = Array.isArray(syncResult) ? [] : syncResult.missingPages;
+    const totalPages = Array.isArray(syncResult) ? 1 : syncResult.totalPages;
 
     if (!players || players.length === 0) {
       throw new Error(`Aucun joueur extrait pour le club ${clubCode}`);
@@ -122,22 +126,31 @@ async function executeSync(request: NextRequest) {
     const playersSynced = await upsertPlayers(players);
     const durationMs = Date.now() - start;
 
-    // 3. Journalisation de succès dans sync_logs
+    // 3. Statut SUCCESS ou PARTIAL avec tolérance de repli
+    const status = isPartial ? "PARTIAL" : "SUCCESS";
+    const errorMessage = isPartial
+      ? `Synchronisation partielle : ${playersSynced} joueurs sauvegardés sur ${totalPages} pages (pages en timeout: [${missingPages.join(", ")}])`
+      : null;
+
+    // 4. Journalisation dans sync_logs
     await logSync({
       clubCode,
-      status: "SUCCESS",
+      status,
       playersSynced,
       durationMs,
-      errorMessage: null,
+      errorMessage,
     });
 
     return NextResponse.json({
       success: true,
-      status: "SUCCESS",
+      status,
       clubCode,
       playersSynced,
+      totalPages,
+      missingPages,
       durationMs,
       timestamp: new Date().toISOString(),
+      message: errorMessage || undefined,
     });
   } catch (err: unknown) {
     const durationMs = Date.now() - start;

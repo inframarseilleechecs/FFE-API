@@ -10,6 +10,7 @@ import {
   Users,
   Clock,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   LogOut,
   Shield,
@@ -42,7 +43,7 @@ export function HeaderBanner() {
   const [syncing, setSyncing] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error" | "warning"; message: string } | null>(null);
 
   // Initialisation du thème depuis localStorage ou système
   useEffect(() => {
@@ -101,10 +102,17 @@ export function HeaderBanner() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setFeedback({
-          type: "success",
-          message: `${data.playersCount || "Tous les"} licenciés synchronisés avec succès (${((data.durationMs || 0) / 1000).toFixed(1)}s).`,
-        });
+        if (data.status === "PARTIAL") {
+          setFeedback({
+            type: "warning",
+            message: `Synchronisation partielle : ${data.playersSynced} licenciés enregistrés (${data.missingPages?.length || 0} page(s) FFE en timeout).`,
+          });
+        } else {
+          setFeedback({
+            type: "success",
+            message: `${data.playersSynced || data.playersCount || "Tous les"} licenciés synchronisés avec succès (${((data.durationMs || 0) / 1000).toFixed(1)}s).`,
+          });
+        }
         await fetchClubStatus();
       } else {
         setFeedback({
@@ -291,12 +299,16 @@ export function HeaderBanner() {
             className={`w-full py-2 px-4 text-xs font-medium text-center transition-all ${
               feedback.type === "success"
                 ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-t border-emerald-500/20"
+                : feedback.type === "warning"
+                ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-t border-amber-500/20"
                 : "bg-rose-500/15 text-rose-800 dark:text-rose-300 border-t border-rose-500/20"
             }`}
           >
             <div className="max-w-7xl mx-auto flex items-center justify-center gap-2">
               {feedback.type === "success" ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : feedback.type === "warning" ? (
+                <AlertCircle className="w-4 h-4 text-amber-500" />
               ) : (
                 <AlertTriangle className="w-4 h-4 text-rose-500" />
               )}

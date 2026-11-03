@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { searchFfePlayers } from "../service";
 
-// Dans GitHub Actions CI, les serveurs FFE bloquent ou limitent souvent les adresses IP des runners cloud
-const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+// Les tests réseau directs vers echecs.asso.fr dépendent de la disponibilité du serveur fédéral (lenteurs de pointe).
+// Ils s'exécutent sur demande explicite avec RUN_LIVE_TESTS=true.
+const shouldRunLive = process.env.RUN_LIVE_TESTS === "true";
 
-describe.skipIf(isCI)("Scraper - Live FFE Server Integration (Online)", () => {
+describe.runIf(shouldRunLive)("Scraper - Live FFE Server Integration (Online)", () => {
   it("queries the live FFE website for CHUKHNO and extracts real data from Marseille-Echecs", async () => {
     const result = await searchFfePlayers({
       nom: "CHUKHNO",

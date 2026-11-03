@@ -9,11 +9,12 @@ import {
   Lock,
   Coins,
   GraduationCap,
+  Terminal,
 } from "lucide-react";
 import { useSession } from "@/lib/auth/client";
 import { UserRole } from "@/lib/db/schema";
 
-export type TabKey = "verify" | "search" | "inventory" | "classes" | "teams" | "analytics";
+export type TabKey = "verify" | "search" | "inventory" | "classes" | "teams" | "analytics" | "logs";
 
 export interface TabConfig {
   key: TabKey;
@@ -72,6 +73,14 @@ export const ALL_TABS: readonly TabConfig[] = [
     active: true,
     badge: "Directeur",
     allowedRoles: ["superadmin", "director"],
+  },
+  {
+    key: "logs",
+    label: "Logs & Audit Système",
+    icon: Terminal,
+    active: true,
+    badge: "Admin",
+    allowedRoles: ["superadmin"],
   },
 ] as const;
 

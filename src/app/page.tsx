@@ -14,6 +14,7 @@ import { InventoryFinanceSection } from "@/components/sections/InventoryFinanceS
 import { CoachClassesSection } from "@/components/sections/CoachClassesSection";
 import { TeamsComingSoonSection } from "@/components/sections/TeamsComingSoonSection";
 import { ClubAnalyticsSection } from "@/components/sections/ClubAnalyticsSection";
+import { SystemLogsSection } from "@/components/sections/SystemLogsSection";
 import { useSession } from "@/lib/auth/client";
 
 export default function Home() {
@@ -50,6 +51,7 @@ export default function Home() {
           {activeTab === "classes" && <CoachClassesSection />}
           {activeTab === "teams" && <TeamsComingSoonSection />}
           {activeTab === "analytics" && <ClubAnalyticsSection />}
+          {activeTab === "logs" && <SystemLogsSection />}
         </div>
       </main>
 

@@ -322,6 +322,36 @@ export async function getLatestSyncLog(): Promise<SyncLogRecord | null> {
 }
 
 /**
+ * Retourne l'historique complet des synchronisations (pour la console d'administration).
+ */
+export async function getSyncLogs(limit = 50): Promise<SyncLogRecord[]> {
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      const res = await pool.query(
+        `SELECT 
+           id,
+           club_code as "clubCode",
+           status,
+           players_synced as "playersSynced",
+           duration_ms as "durationMs",
+           error_message as "errorMessage",
+           created_at as "createdAt"
+         FROM sync_logs
+         ORDER BY created_at DESC
+         LIMIT $1;`,
+        [limit]
+      );
+      return res.rows;
+    } catch (err) {
+      console.warn("Échec lecture sync_logs Postgres, bascule sur mémoire:", err);
+    }
+  }
+
+  return memoryLogs.slice(0, limit);
+}
+
+/**
  * Retourne le nombre total de joueurs licenciés enregistrés en base.
  */
 export async function getPlayersCount(): Promise<number> {
