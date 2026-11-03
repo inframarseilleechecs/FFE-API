@@ -132,15 +132,40 @@ export async function resolveClub(clubInput: string): Promise<Club[]> {
   return clubs;
 }
 
+export interface FetchClubMembersOptions {
+  concurrency?: number;
+  onProgress?: (current: number, total: number) => void;
+}
+
+export interface FetchClubMembersResult {
+  players: Player[];
+  totalPages: number;
+  pagesFetched: number[];
+  missingPages: number[];
+  isPartial: boolean;
+}
+
 /**
  * Télécharge la totalité des licenciés d'un club (ex: Marseille-Échecs)
- * en gérant la pagination ASP.NET multi-pages (__VIEWSTATE, __EVENTTARGET).
+ * en mode parallèle par lots concurrents de 4 pages (Promise.allSettled)
+ * avec tolérance aux pannes (Graceful Partial Fallback).
  */
 export async function fetchAllClubMembers(
   clubCode: string,
-  onProgress?: (current: number, total: number) => void
-): Promise<Player[]> {
-  if (!clubCode) return [];
+  options?: ((current: number, total: number) => void) | FetchClubMembersOptions
+): Promise<FetchClubMembersResult> {
+  if (!clubCode) {
+    return {
+      players: [],
+      totalPages: 0,
+      pagesFetched: [],
+      missingPages: [],
+      isPartial: false,
+    };
+  }
+
+  const onProgress = typeof options === "function" ? options : options?.onProgress;
+  const concurrency = (typeof options === "object" && options?.concurrency) || 4;
 
   const listUrl = `${FFE_BASE_URL}/ListeJoueurs.aspx?Action=CLUBCODE&ClubCode=${encodeURIComponent(
     clubCode
@@ -149,9 +174,11 @@ export async function fetchAllClubMembers(
   // 1. Page 1 (GET)
   const firstHtml = await fetchFfePage(listUrl);
   const totalPages = extractTotalPages(firstHtml);
-  let { viewState, viewStateGenerator } = extractViewState(firstHtml);
+  const { viewState, viewStateGenerator } = extractViewState(firstHtml);
 
   const allPlayersMap = new Map<string, Player>();
+  const pagesFetched: number[] = [1];
+  const missingPages: number[] = [];
 
   // Parsing page 1
   for (const p of parseFfePlayersTable(firstHtml)) {
@@ -162,41 +189,73 @@ export async function fetchAllClubMembers(
     onProgress(1, totalPages);
   }
 
-  // 2. Pages suivantes (POST ASP.NET)
-  for (let page = 2; page <= totalPages; page++) {
-    const postBody = new URLSearchParams({
-      __VIEWSTATE: viewState,
-      __VIEWSTATEGENERATOR: viewStateGenerator,
-      __EVENTTARGET: "ctl00$ContentPlaceHolderMain$PagerHeader",
-      __EVENTARGUMENT: page.toString(),
-    });
+  // 2. Si page unique, terminer immédiatement
+  if (totalPages <= 1) {
+    return {
+      players: Array.from(allPlayersMap.values()),
+      totalPages: 1,
+      pagesFetched: [1],
+      missingPages: [],
+      isPartial: false,
+    };
+  }
 
-    try {
-      const pageHtml = await fetchFfePage(listUrl, {
-        method: "POST",
-        body: postBody.toString(),
+  // 3. Pages suivantes par vagues concurrentes de taille `concurrency` (défaut 4)
+  const remainingPages: number[] = [];
+  for (let p = 2; p <= totalPages; p++) {
+    remainingPages.push(p);
+  }
+
+  for (let i = 0; i < remainingPages.length; i += concurrency) {
+    const chunk = remainingPages.slice(i, i + concurrency);
+
+    const chunkPromises = chunk.map(async (page) => {
+      const postBody = new URLSearchParams({
+        __VIEWSTATE: viewState,
+        __VIEWSTATEGENERATOR: viewStateGenerator,
+        __EVENTTARGET: "ctl00$ContentPlaceHolderMain$PagerHeader",
+        __EVENTARGUMENT: page.toString(),
       });
 
-      // Mise à jour de l'état pour la page suivante
-      const nextState = extractViewState(pageHtml);
-      if (nextState.viewState) {
-        viewState = nextState.viewState;
-      }
-      if (nextState.viewStateGenerator) {
-        viewStateGenerator = nextState.viewStateGenerator;
-      }
+      try {
+        const pageHtml = await fetchFfePage(listUrl, {
+          method: "POST",
+          body: postBody.toString(),
+          customHeaders: {
+            Referer: listUrl,
+          },
+        });
 
-      for (const p of parseFfePlayersTable(pageHtml)) {
-        allPlayersMap.set(p.nrFFE, p);
+        const pagePlayers = parseFfePlayersTable(pageHtml);
+        return { page, players: pagePlayers, success: true as const };
+      } catch (err) {
+        console.error(`Erreur pagination club ${clubCode} page ${page}:`, err);
+        return { page, error: err, success: false as const };
       }
+    });
 
+    const results = await Promise.all(chunkPromises);
+
+    for (const res of results) {
+      if (res.success) {
+        pagesFetched.push(res.page);
+        for (const p of res.players) {
+          allPlayersMap.set(p.nrFFE, p);
+        }
+      } else {
+        missingPages.push(res.page);
+      }
       if (onProgress) {
-        onProgress(page, totalPages);
+        onProgress(pagesFetched.length, totalPages);
       }
-    } catch (err) {
-      console.error(`Erreur pagination club ${clubCode} page ${page}:`, err);
     }
   }
 
-  return Array.from(allPlayersMap.values());
+  return {
+    players: Array.from(allPlayersMap.values()),
+    totalPages,
+    pagesFetched: pagesFetched.sort((a, b) => a - b),
+    missingPages: missingPages.sort((a, b) => a - b),
+    isPartial: missingPages.length > 0,
+  };
 }

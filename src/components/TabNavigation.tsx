@@ -9,11 +9,12 @@ import {
   Lock,
   Coins,
   GraduationCap,
+  Terminal,
 } from "lucide-react";
 import { useSession } from "@/lib/auth/client";
 import { UserRole } from "@/lib/db/schema";
 
-export type TabKey = "verify" | "search" | "inventory" | "classes" | "teams" | "analytics";
+export type TabKey = "verify" | "search" | "inventory" | "classes" | "teams" | "analytics" | "logs";
 
 export interface TabConfig {
   key: TabKey;
@@ -73,6 +74,14 @@ export const ALL_TABS: readonly TabConfig[] = [
     badge: "Directeur",
     allowedRoles: ["superadmin", "director"],
   },
+  {
+    key: "logs",
+    label: "Logs & Audit Système",
+    icon: Terminal,
+    active: true,
+    badge: "Admin",
+    allowedRoles: ["superadmin"],
+  },
 ] as const;
 
 /**
@@ -116,7 +125,7 @@ export function TabNavigation({ activeTab, onTabChange, userRole }: TabNavigatio
 
   return (
     <nav className="w-full no-print" aria-label="Navigation principale">
-      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl glass-card max-w-full overflow-x-auto scrollbar-none shadow-sm">
+      <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-2xl glass-card w-full shadow-sm">
         {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           const isSelected = activeTab === tab.key;
@@ -126,7 +135,7 @@ export function TabNavigation({ activeTab, onTabChange, userRole }: TabNavigatio
             <button
               key={tab.key}
               onClick={() => onTabChange(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 transform ${
+              className={`flex items-center gap-1.5 px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 transform ${
                 isSelected
                   ? "bg-marseille-500 text-white shadow-md shadow-marseille-500/25 scale-[1.01]"
                   : isEnabled

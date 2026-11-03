@@ -10,6 +10,7 @@ import {
   Users,
   Clock,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   LogOut,
   Shield,
@@ -25,6 +26,11 @@ interface ClubStatusData {
   clubCode: string;
   clubName: string;
   totalMembers: number;
+  totalPlayers?: number;
+  activeMembers?: number;
+  licenseA?: number;
+  licenseB?: number;
+  inactiveMembers?: number;
   lastSync: {
     status: string;
     playersSynced: number;
@@ -42,7 +48,7 @@ export function HeaderBanner() {
   const [syncing, setSyncing] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error" | "warning"; message: string } | null>(null);
 
   // Initialisation du thème depuis localStorage ou système
   useEffect(() => {
@@ -101,10 +107,17 @@ export function HeaderBanner() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setFeedback({
-          type: "success",
-          message: `${data.playersCount || "Tous les"} licenciés synchronisés avec succès (${((data.durationMs || 0) / 1000).toFixed(1)}s).`,
-        });
+        if (data.status === "PARTIAL") {
+          setFeedback({
+            type: "warning",
+            message: `Synchronisation partielle : ${data.playersSynced} licenciés enregistrés (${data.missingPages?.length || 0} page(s) FFE en timeout).`,
+          });
+        } else {
+          setFeedback({
+            type: "success",
+            message: `${data.playersSynced || data.playersCount || "Tous les"} licenciés synchronisés avec succès (${((data.durationMs || 0) / 1000).toFixed(1)}s).`,
+          });
+        }
         await fetchClubStatus();
       } else {
         setFeedback({
@@ -120,6 +133,9 @@ export function HeaderBanner() {
       });
     } finally {
       setSyncing(false);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("recupffe:sync-completed"));
+      }
       setTimeout(() => setFeedback(null), 8000);
     }
   };
@@ -179,9 +195,27 @@ export function HeaderBanner() {
               <div className="flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-marseille-500 dark:text-sky-400" />
                 <span className="font-semibold text-slate-900 dark:text-white">
-                  {status ? `${status.totalMembers ?? (status as any).totalPlayers ?? 0} licenciés` : (loading ? "..." : "0 licencié")}
+                  {status ? (
+                    <>
+                      <span>{status.activeMembers ?? status.totalMembers ?? 0} licenciés</span>
+                      {status.licenseA !== undefined && status.licenseB !== undefined && (
+                        <span className="font-normal text-slate-500 dark:text-slate-400 ml-1 text-[11px]">
+                          ({status.licenseA} A • {status.licenseB} B)
+                        </span>
+                      )}
+                    </>
+                  ) : (loading ? "..." : "0 licencié")}
                 </span>
               </div>
+
+              {status?.inactiveMembers ? (
+                <span
+                  className="hidden md:inline-flex items-center text-[10px] px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 font-medium cursor-help"
+                  title="Anciens adhérents enregistrés dans la base locale, non encore renouvelés pour la saison en cours 2026-2027"
+                >
+                  + {status.inactiveMembers} non renouvelés
+                </span>
+              ) : null}
 
               <span className="w-px h-3.5 bg-slate-300 dark:bg-slate-700"></span>
 
@@ -291,12 +325,16 @@ export function HeaderBanner() {
             className={`w-full py-2 px-4 text-xs font-medium text-center transition-all ${
               feedback.type === "success"
                 ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-t border-emerald-500/20"
+                : feedback.type === "warning"
+                ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-t border-amber-500/20"
                 : "bg-rose-500/15 text-rose-800 dark:text-rose-300 border-t border-rose-500/20"
             }`}
           >
             <div className="max-w-7xl mx-auto flex items-center justify-center gap-2">
               {feedback.type === "success" ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : feedback.type === "warning" ? (
+                <AlertCircle className="w-4 h-4 text-amber-500" />
               ) : (
                 <AlertTriangle className="w-4 h-4 text-rose-500" />
               )}

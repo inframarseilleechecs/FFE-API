@@ -31,7 +31,13 @@ describe("API RBAC Guards Integration (Step 9)", () => {
   beforeEach(async () => {
     clearMemoryDb();
     vi.restoreAllMocks();
-    vi.spyOn(scraperService, "fetchAllClubMembers").mockResolvedValue([mockMaxime]);
+    vi.spyOn(scraperService, "fetchAllClubMembers").mockResolvedValue({
+      players: [mockMaxime],
+      totalPages: 1,
+      pagesFetched: [1],
+      missingPages: [],
+      isPartial: false,
+    });
     await upsertPlayers([mockMaxime]);
   });
 
