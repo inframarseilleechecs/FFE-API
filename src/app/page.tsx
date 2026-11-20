@@ -10,7 +10,7 @@ import {
 } from "@/components/TabNavigation";
 import { LicenseVerificationSection } from "@/components/sections/LicenseVerificationSection";
 import { PlayerSearchSection } from "@/components/sections/PlayerSearchSection";
-import { InventoryFinanceSection } from "@/components/sections/InventoryFinanceSection";
+import { InventorySection } from "@/components/sections/InventorySection";
 import { CoachClassesSection } from "@/components/sections/CoachClassesSection";
 import { TeamsComingSoonSection } from "@/components/sections/TeamsComingSoonSection";
 import { ClubAnalyticsSection } from "@/components/sections/ClubAnalyticsSection";
@@ -47,7 +47,7 @@ export default function Home() {
         <div className="transition-all duration-300">
           {activeTab === "verify" && <LicenseVerificationSection />}
           {activeTab === "search" && <PlayerSearchSection />}
-          {activeTab === "inventory" && <InventoryFinanceSection />}
+          {activeTab === "inventory" && <InventorySection />}
           {activeTab === "classes" && <CoachClassesSection />}
           {activeTab === "teams" && <TeamsComingSoonSection />}
           {activeTab === "analytics" && <ClubAnalyticsSection />}

@@ -6,7 +6,13 @@
 import { describe, it, expect } from "vitest";
 import { getUserByEmail, getAllUsers } from "../users";
 import { getAllClasses, getClassesByCoachId } from "../classes";
-import { getAllInventoryItems, getLowStockAlerts, updateInventoryStock } from "../inventory";
+import {
+  getAllEquipmentItems,
+  getLowStockEquipmentAlerts,
+  createEquipmentMember,
+  updateEquipmentMember,
+  deleteEquipmentMember,
+} from "../inventory";
 
 describe("Repositories v1.2 Integration", () => {
   it("récupère les utilisateurs officiels du seed", async () => {
@@ -42,35 +48,46 @@ describe("Repositories v1.2 Integration", () => {
     }
   });
 
-  it("récupère les articles de l\'inventaire et détecte les alertes de réassort", async () => {
-    const items = await getAllInventoryItems();
+  it("récupère les équipements d'inventaire (Polo, Veste, Divers) et détecte les alertes stock bas", async () => {
+    const items = await getAllEquipmentItems();
     expect(items.length).toBeGreaterThanOrEqual(5);
 
     const categories = new Set(items.map((i) => i.category));
-    expect(categories.has("BOUTIQUE")).toBe(true);
-    expect(categories.has("BUVETTE")).toBe(true);
-    expect(categories.has("BIBLIOTHEQUE")).toBe(true);
+    expect(categories.has("POLO")).toBe(true);
+    expect(categories.has("VESTE")).toBe(true);
+    expect(categories.has("DIVERS")).toBe(true);
 
-    const lowStock = await getLowStockAlerts();
-    // La bouteille d'eau a un stock de 4 pour un seuil de 12
+    const lowStock = await getLowStockEquipmentAlerts();
     expect(lowStock.length).toBeGreaterThanOrEqual(1);
-    expect(lowStock.some((i) => i.name.includes("Bouteille Eau"))).toBe(true);
+    expect(lowStock.some((i) => i.type.includes("Veste Club L"))).toBe(true);
   });
 
-  it("ajuste correctement les stocks et trace les mouvements dans l'historique", async () => {
-    const items = await getAllInventoryItems();
-    const dgtClock = items.find((i) => i.name.includes("Pendule"));
-    expect(dgtClock).toBeDefined();
+  it("met à jour nbDistributed lorsqu'un équipement dû passe à distribué", async () => {
+    const items = await getAllEquipmentItems("POLO");
+    const polo = items[0];
+    expect(polo).toBeDefined();
 
-    if (dgtClock) {
-      const initialStock = dgtClock.stockQuantity;
-      // Vente de 1 pendule
-      const { item, isAlert } = await updateInventoryStock(dgtClock.id, -1, "VENTE_TEST");
-      expect(item?.stockQuantity).toBe(initialStock - 1);
+    const initialDistributed = polo.nbDistributed;
+    const member = await createEquipmentMember({
+      seasonYear: 2027,
+      firstname: "Lucas",
+      lastname: "Test",
+      birthDate: "15-05-2012",
+      poloItemId: polo.id,
+      poloDistributed: false,
+      paymentOk: true,
+    });
 
-      // Rétablissement du stock initial
-      const restored = await updateInventoryStock(dgtClock.id, 1, "RESTORE_TEST");
-      expect(restored.item?.stockQuantity).toBe(initialStock);
-    }
+    // Dû mais non distribué -> nbDistributed inchangé
+    const afterDue = (await getAllEquipmentItems("POLO")).find((i) => i.id === polo.id)!;
+    expect(afterDue.nbDistributed).toBe(initialDistributed);
+
+    // Coché "Distribué" -> nbDistributed + 1
+    await updateEquipmentMember(member.id, { poloDistributed: true });
+    const afterDist = (await getAllEquipmentItems("POLO")).find((i) => i.id === polo.id)!;
+    expect(afterDist.nbDistributed).toBe(initialDistributed + 1);
+
+    // Nettoyage
+    await deleteEquipmentMember(member.id);
   });
 });
