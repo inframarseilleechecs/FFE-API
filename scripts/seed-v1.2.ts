@@ -10,7 +10,12 @@ import { getDbPool, closeDbPool } from "../src/lib/db/client";
 import { initDatabase } from "../src/lib/db/repository";
 import { getUserByEmail } from "../src/lib/db/users";
 import { createClass, getAllClasses } from "../src/lib/db/classes";
-import { createInventoryItem, getAllInventoryItems } from "../src/lib/db/inventory";
+import {
+  createEquipmentItem,
+  createInventorySeason,
+  getAllEquipmentItems,
+  getInventorySeasons,
+} from "../src/lib/db/inventory";
 
 async function seed() {
   console.log("🌱 Démarrage du Seeding Marseille-Échecs v1.2...");
@@ -105,58 +110,57 @@ async function seed() {
     console.log(`ℹ️ ${existingClasses.length} cours déjà présents.`);
   }
 
-  // 5. Seeding de l'Inventaire
-  const existingItems = await getAllInventoryItems();
+  // 5. Seeding des Saisons & Équipements d'Inventaire (Polo, Veste, Divers)
+  const existingSeasons = await getInventorySeasons();
+  if (existingSeasons.length === 0) {
+    await createInventorySeason(2026, "Saison 2025-2026");
+    await createInventorySeason(2027, "Saison 2026-2027");
+    console.log("✅ 2 saisons d'inventaire créées (2026 et 2027).");
+  } else {
+    console.log(`ℹ️ ${existingSeasons.length} saisons d'inventaire déjà présentes.`);
+  }
+
+  const existingItems = await getAllEquipmentItems();
   if (existingItems.length === 0) {
     const items = [
       {
-        name: "T-shirt officiel Marseille-Échecs",
-        category: "BOUTIQUE" as const,
-        stockQuantity: 25,
-        unitPrice: 15.0,
-        alertThreshold: 5,
-        description: "T-shirt respirant floqué logo officiel du club",
+        category: "POLO" as const,
+        type: "Polo Enfant 10 ans",
+        quantitySinceLastInventory: 20,
+        threshold: 5,
       },
       {
-        name: "Pendule électronique DGT 2010",
-        category: "BOUTIQUE" as const,
-        stockQuantity: 8,
-        unitPrice: 45.0,
-        alertThreshold: 3,
-        description: "Pendule officielle homologuée FIDE",
+        category: "POLO" as const,
+        type: "Polo Adulte M",
+        quantitySinceLastInventory: 15,
+        threshold: 5,
       },
       {
-        name: "Café expresso Illy",
-        category: "BUVETTE" as const,
-        stockQuantity: 100,
-        unitPrice: 1.0,
-        alertThreshold: 20,
-        description: "Capsule café pour buvette des tournois",
+        category: "VESTE" as const,
+        type: "Veste Club M",
+        quantitySinceLastInventory: 10,
+        threshold: 3,
       },
       {
-        name: "Bouteille Eau Minérale 50cl",
-        category: "BUVETTE" as const,
-        stockQuantity: 4, // ⚠️ En alerte de réassort (4 <= 12)
-        unitPrice: 1.0,
-        alertThreshold: 12,
-        description: "Pack eau fraîche 50cl",
+        category: "VESTE" as const,
+        type: "Veste Club L",
+        quantitySinceLastInventory: 3, // ⚠️ En alerte stock bas (3 <= 4)
+        threshold: 4,
       },
       {
-        name: "Mon Système - Aaron Nimzowitsch",
-        category: "BIBLIOTHEQUE" as const,
-        stockQuantity: 2,
-        unitPrice: 22.0,
-        alertThreshold: 1,
-        description: "Livre classique de stratégie échiquéenne",
+        category: "DIVERS" as const,
+        type: "Sac Marseille-Échecs",
+        quantitySinceLastInventory: 25,
+        threshold: 5,
       },
     ];
 
     for (const item of items) {
-      await createInventoryItem(item);
+      await createEquipmentItem(item);
     }
-    console.log("✅ 5 articles d'inventaire créés (dont 1 en alerte de réassort : Eau 50cl).");
+    console.log("✅ 5 équipements d'inventaire créés (Polo, Veste, Divers — dont 1 en alerte stock bas).");
   } else {
-    console.log(`ℹ️ ${existingItems.length} articles d'inventaire déjà présents.`);
+    console.log(`ℹ️ ${existingItems.length} équipements d'inventaire déjà présents.`);
   }
 
   await closeDbPool();

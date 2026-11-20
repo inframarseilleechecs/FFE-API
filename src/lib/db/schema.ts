@@ -86,29 +86,45 @@ export interface ClassRecord {
   createdAt: Date;
 }
 
-export type InventoryCategory = "BOUTIQUE" | "BUVETTE" | "BIBLIOTHEQUE";
+export type EquipmentCategory = "POLO" | "VESTE" | "DIVERS";
 
-export interface InventoryItemRecord {
+export interface InventorySeasonRecord {
+  year: number;
+  label: string;
+  createdAt: Date;
+}
+
+export interface EquipmentItemRecord {
   id: number;
-  name: string;
-  category: InventoryCategory;
-  stockQuantity: number;
-  unitPrice: number;
-  alertThreshold: number;
-  description: string | null;
-  lastRestockedAt: Date | null;
-  updatedBy: string | null;
+  category: EquipmentCategory;
+  type: string;                       // Ex: "Polo M", "Veste 12 ans", "Sac club"
+  quantitySinceLastInventory: number; // Stock de référence depuis le dernier inventaire
+  nbDistributed: number;              // Nombre d'unités effectivement remises (calculé)
+  stockRemaining: number;             // quantitySinceLastInventory - nbDistributed (calculé)
+  threshold: number;                  // Seuil d'alerte stock bas
+  isLowStock: boolean;                // stockRemaining <= threshold (calculé)
+  usageCount: number;                 // Nombre total de références (dues ou distribuées)
+  canDelete: boolean;                 // true uniquement si usageCount === 0 (DELETE IF NEVER USED)
+  lastInventoryAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface InventoryLogRecord {
+export interface EquipmentMemberRecord {
   id: number;
-  itemId: number;
-  changeAmount: number;
-  reason: string;
-  performedBy: string | null;
+  seasonYear: number;
+  firstname: string;
+  lastname: string;
+  birthDate: string;                  // Format DD-MM-YYYY (ou vide si non renseigné)
+  poloItemId: number | null;
+  poloDistributed: boolean;
+  vesteItemId: number | null;
+  vesteDistributed: boolean;
+  diversItemId: number | null;
+  diversDistributed: boolean;
+  paymentOk: boolean;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
@@ -220,31 +236,47 @@ CREATE TABLE IF NOT EXISTS classes (
 
 CREATE INDEX IF NOT EXISTS idx_classes_coach_id ON classes(coach_id);
 
-CREATE TABLE IF NOT EXISTS inventory_items (
+-- Module Inventaire & Équipements (Saisons, Catalogue Polo/Veste/Divers, Suivi Membres)
+CREATE TABLE IF NOT EXISTS inventory_seasons (
+  year INTEGER PRIMARY KEY,
+  label VARCHAR(100) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS equipment_items (
   id SERIAL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  category VARCHAR(50) NOT NULL,
-  stock_quantity INTEGER NOT NULL DEFAULT 0,
-  unit_price NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
-  alert_threshold INTEGER NOT NULL DEFAULT 5,
-  description TEXT,
-  last_restocked_at TIMESTAMPTZ,
-  updated_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+  category VARCHAR(20) NOT NULL CHECK (category IN ('POLO', 'VESTE', 'DIVERS')),
+  type VARCHAR(150) NOT NULL,
+  quantity_since_last_inventory INTEGER NOT NULL DEFAULT 0,
+  threshold INTEGER NOT NULL DEFAULT 5,
+  last_inventory_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (category, type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_items_category ON equipment_items(category);
+
+CREATE TABLE IF NOT EXISTS equipment_members (
+  id SERIAL PRIMARY KEY,
+  season_year INTEGER NOT NULL REFERENCES inventory_seasons(year) ON DELETE CASCADE,
+  firstname VARCHAR(100) NOT NULL,
+  lastname VARCHAR(100) NOT NULL,
+  birth_date VARCHAR(20) NOT NULL DEFAULT '',
+  polo_item_id INTEGER REFERENCES equipment_items(id) ON DELETE RESTRICT,
+  polo_distributed BOOLEAN NOT NULL DEFAULT FALSE,
+  veste_item_id INTEGER REFERENCES equipment_items(id) ON DELETE RESTRICT,
+  veste_distributed BOOLEAN NOT NULL DEFAULT FALSE,
+  divers_item_id INTEGER REFERENCES equipment_items(id) ON DELETE RESTRICT,
+  divers_distributed BOOLEAN NOT NULL DEFAULT FALSE,
+  payment_ok BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory_items(category);
-
-CREATE TABLE IF NOT EXISTS inventory_logs (
-  id SERIAL PRIMARY KEY,
-  item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
-  change_amount INTEGER NOT NULL,
-  reason VARCHAR(100) NOT NULL,
-  performed_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_inventory_logs_item ON inventory_logs(item_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_members_season ON equipment_members(season_year);
+CREATE INDEX IF NOT EXISTS idx_equipment_members_polo ON equipment_members(polo_item_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_members_veste ON equipment_members(veste_item_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_members_divers ON equipment_members(divers_item_id);
 `;
 
