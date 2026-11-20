@@ -10,8 +10,12 @@ import {
   computeInventoryKpis,
   filterInventoryMembers,
   buildEquipmentChangePatch,
+  groupEquipmentByCategory,
+  filterPreviewRows,
+  canConfirmImport,
 } from "../sections/inventory_ui_helpers";
 import { EquipmentItemRecord, EquipmentMemberRecord } from "@/lib/db/schema";
+import { parseInventoryRows } from "@/lib/parser/inventory_excel";
 
 const now = new Date();
 
@@ -128,5 +132,36 @@ describe("Inventory UI Logic & Navigation (Étape 4)", () => {
 
     const selectPatch = buildEquipmentChangePatch("poloItemId", "poloDistributed", "2");
     expect(selectPatch).toEqual({ poloItemId: 2 });
+  });
+
+  it("regroupe le catalogue en 3 tables (POLO, VESTE, DIVERS) et expose canDelete / isLowStock", () => {
+    const grouped = groupEquipmentByCategory(SAMPLE_ITEMS);
+    expect(grouped.POLO).toHaveLength(1);
+    expect(grouped.VESTE).toHaveLength(1);
+    expect(grouped.DIVERS).toHaveLength(0);
+    expect(grouped.VESTE[0].isLowStock).toBe(true);
+    expect(grouped.POLO[0].canDelete).toBe(false);
+  });
+
+  it("filtre les lignes du Pre-Visualizer par statut et désactive le bouton d'import si 0 ligne importable", () => {
+    const preview = parseInventoryRows(
+      [
+        { Prénom: "Maxime", Nom: "Chukhno", Polo: "Polo Adulte M" },
+        { Prénom: "Sarah", Nom: "Benali", Polo: "Polo Inconnu" },
+        { Prénom: "", Nom: "Incomplet" },
+      ],
+      SAMPLE_ITEMS
+    );
+
+    expect(filterPreviewRows(preview.rows, "ALL")).toHaveLength(3);
+    expect(filterPreviewRows(preview.rows, "VALID")).toHaveLength(1);
+    expect(filterPreviewRows(preview.rows, "WARNING")).toHaveLength(1);
+    expect(filterPreviewRows(preview.rows, "ERROR")).toHaveLength(1);
+    expect(canConfirmImport(preview)).toBe(true);
+
+    // Si toutes les lignes sont en ERROR, confirmation bloquée
+    const allErrors = parseInventoryRows([{ Prénom: "", Nom: "SansPrenom" }], SAMPLE_ITEMS);
+    expect(canConfirmImport(allErrors)).toBe(false);
+    expect(canConfirmImport(null)).toBe(false);
   });
 });
