@@ -123,3 +123,31 @@ CREATE INDEX IF NOT EXISTS idx_equipment_members_divers ON equipment_members(div
 
 4. **Déduplication lors de l'import Excel** :
    - Sur une saison donnée (`season_year`), l'import en lot identifie les joueurs existants sur la clé normalisée `(season_year, LOWER(firstname), LOWER(lastname), birth_date)` pour mettre à jour sans créer de doublons.
+
+---
+
+## 4. Application du Schéma en Production
+
+Le schéma n'est **pas créé automatiquement** au démarrage de l'application Next.js. Il doit être appliqué une fois sur la base cible (Neon, Supabase, PostgreSQL managé, etc.) avec la commande idempotente :
+
+```bash
+DATABASE_URL="postgresql://..." npm run db:migrate
+```
+
+La commande `scripts/migrate-v1.2.ts` exécute uniquement le DDL (`CREATE TABLE IF NOT EXISTS` + index), puis vérifie la présence de :
+
+- `inventory_seasons`
+- `equipment_items`
+- `equipment_members`
+
+Elle ne crée **aucun compte ni donnée de démonstration**. Ne pas utiliser `npm run seed` en production : ce script est réservé au développement et crée les comptes de test.
+
+Vérification manuelle possible :
+
+```sql
+SELECT to_regclass('public.inventory_seasons') AS inventory_seasons,
+       to_regclass('public.equipment_items')  AS equipment_items,
+       to_regclass('public.equipment_members') AS equipment_members;
+```
+
+En cas de succès, les trois colonnes doivent retourner un nom de table (et non `NULL`).

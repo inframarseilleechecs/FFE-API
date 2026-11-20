@@ -82,6 +82,8 @@ export function InventorySection() {
   const [showAddSeasonModal, setShowAddSeasonModal] = useState(false);
   const [newSeasonYear, setNewSeasonYear] = useState<string>("");
   const [newSeasonLabel, setNewSeasonLabel] = useState<string>("");
+  const [seasonError, setSeasonError] = useState<string | null>(null);
+  const [isCreatingSeason, setIsCreatingSeason] = useState(false);
 
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [memberForm, setMemberForm] = useState<MemberFormState>(EMPTY_MEMBER_FORM);
@@ -103,16 +105,19 @@ export function InventorySection() {
       const seasonsData = await seasonsRes.json();
       const itemsData = await itemsRes.json();
 
-      if (seasonsRes.ok && seasonsData.success) {
-        const list: InventorySeasonRecord[] = seasonsData.seasons || [];
-        setSeasons(list);
-        if (list.length > 0) {
-          setSelectedYear((prev) => (list.some((s) => s.year === prev) ? prev : list[0].year));
-        }
+      if (!seasonsRes.ok || !seasonsData.success) {
+        throw new Error(seasonsData.error || "Impossible de charger les saisons d'inventaire.");
       }
-      if (itemsRes.ok && itemsData.success) {
-        setItems(itemsData.items || []);
+      if (!itemsRes.ok || !itemsData.success) {
+        throw new Error(itemsData.error || "Impossible de charger le catalogue d'équipements.");
       }
+
+      const list: InventorySeasonRecord[] = seasonsData.seasons || [];
+      setSeasons(list);
+      if (list.length > 0) {
+        setSelectedYear((prev) => (list.some((s) => s.year === prev) ? prev : list[0].year));
+      }
+      setItems(itemsData.items || []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur de chargement de l'inventaire.");
     }
@@ -165,14 +170,31 @@ export function InventorySection() {
 
   // --- Actions API ---
 
+  const openAddSeasonModal = () => {
+    const maxYear = seasons.length > 0 ? Math.max(...seasons.map((s) => s.year)) : 2027;
+    setNewSeasonYear(String(maxYear + 1));
+    setNewSeasonLabel(`Saison ${maxYear}-${maxYear + 1}`);
+    setSeasonError(null);
+    setShowAddSeasonModal(true);
+  };
+
+  const closeAddSeasonModal = () => {
+    setShowAddSeasonModal(false);
+    setSeasonError(null);
+    setIsCreatingSeason(false);
+  };
+
   const handleCreateSeason = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSeasonError(null);
+
     const y = parseInt(newSeasonYear, 10);
     if (Number.isNaN(y) || y < 2000 || y > 2100) {
-      notify("error", "Veuillez saisir une année valide (ex: 2028).");
+      setSeasonError("Veuillez saisir une année valide (ex: 2028).");
       return;
     }
 
+    setIsCreatingSeason(true);
     try {
       const res = await fetch("/api/inventory/seasons", {
         method: "POST",
@@ -182,19 +204,22 @@ export function InventorySection() {
           label: newSeasonLabel.trim() || `Saison ${y - 1}-${y}`,
         }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        notify("error", data.error || "Erreur lors de la création de l'année.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        setSeasonError(data?.error || "Erreur lors de la création de l'année.");
         return;
       }
       await fetchSeasonsAndItems();
       setSelectedYear(y);
-      setShowAddSeasonModal(false);
       setNewSeasonYear("");
       setNewSeasonLabel("");
+      setShowAddSeasonModal(false);
+      setSeasonError(null);
       notify("success", `Année ${y} ajoutée avec succès.`);
     } catch {
-      notify("error", "Erreur réseau lors de la création de l'année.");
+      setSeasonError("Erreur réseau lors de la création de l'année.");
+    } finally {
+      setIsCreatingSeason(false);
     }
   };
 
@@ -442,12 +467,7 @@ export function InventorySection() {
               {canManage && (
                 <button
                   type="button"
-                  onClick={() => {
-                    const maxYear = seasons.length > 0 ? Math.max(...seasons.map((s) => s.year)) : 2027;
-                    setNewSeasonYear(String(maxYear + 1));
-                    setNewSeasonLabel(`Saison ${maxYear}-${maxYear + 1}`);
-                    setShowAddSeasonModal(true);
-                  }}
+                  onClick={openAddSeasonModal}
                   className="p-1.5 rounded-lg bg-marseille-500 hover:bg-marseille-600 text-white transition-colors"
                   title="Créer une nouvelle année d'inventaire"
                 >
@@ -774,10 +794,23 @@ export function InventorySection() {
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Créer une nouvelle année d&apos;inventaire
               </h3>
-              <button type="button" onClick={() => setShowAddSeasonModal(false)}>
+              <button
+                type="button"
+                onClick={closeAddSeasonModal}
+                disabled={isCreatingSeason}
+                className="disabled:opacity-40"
+              >
                 <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
+
+            {seasonError && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-xl text-xs bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{seasonError}</span>
+              </div>
+            )}
+
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -790,7 +823,8 @@ export function InventorySection() {
                   max={2100}
                   value={newSeasonYear}
                   onChange={(e) => setNewSeasonYear(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                  disabled={isCreatingSeason}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 disabled:opacity-60"
                 />
               </div>
               <div>
@@ -801,23 +835,26 @@ export function InventorySection() {
                   type="text"
                   value={newSeasonLabel}
                   onChange={(e) => setNewSeasonLabel(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                  disabled={isCreatingSeason}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 disabled:opacity-60"
                 />
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setShowAddSeasonModal(false)}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                onClick={closeAddSeasonModal}
+                disabled={isCreatingSeason}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Annuler
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-marseille-500 hover:bg-marseille-600 text-white"
+                disabled={isCreatingSeason}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-marseille-500 hover:bg-marseille-600 text-white disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Créer l&apos;année
+                {isCreatingSeason ? "Création..." : "Créer l'année"}
               </button>
             </div>
           </form>
