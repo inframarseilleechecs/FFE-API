@@ -10,6 +10,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "db:migrate": "tsx scripts/migrate-v1.2.ts",
     "seed": "tsx --env-file=.env.local scripts/seed-v1.2.ts"
   },
   "dependencies": {
