@@ -7,7 +7,7 @@ import {
   Users,
   BarChart3,
   Lock,
-  Coins,
+  Package,
   GraduationCap,
   Terminal,
 } from "lucide-react";
@@ -44,8 +44,8 @@ export const ALL_TABS: readonly TabConfig[] = [
   },
   {
     key: "inventory",
-    label: "Inventaire & Finances",
-    icon: Coins,
+    label: "Inventaire & Équipements",
+    icon: Package,
     active: true,
     badge: "v1.2",
     allowedRoles: ["superadmin", "director", "secretary"],
